@@ -7,9 +7,7 @@ import (
 )
 
 // Errors is a list of errors with stack traces. It implements the error interface
-type Errors struct {
-	errs []*Error
-}
+type Errors []*Error
 
 // Errf is a closure around Errorf to provide comparable but descriptive errors
 type Errf func(...interface{}) *Error
@@ -19,8 +17,7 @@ func Add(e interface{}, ee interface{}) *Errors {
 	if errs, ok := e.(*Errors); ok {
 		return errs.Add(ee)
 	} else if err, ok := e.(*Error); ok {
-		errs := &Errors{errs: make([]*Error, 0)}
-		errs = errs.Add(err)
+		errs := New(err)
 		return errs.Add(ee)
 	} else {
 		errs := New(ee)
@@ -36,20 +33,23 @@ func (e *Errors) Add(ee interface{}) *Errors {
 		var err error
 
 		if e == nil {
-			e = &Errors{errs: make([]*Error, 0)}
+			e = New(nil)
 		}
 		switch ee := ee.(type) {
 		case *Error:
 			err = ee
-			e.errs = append(e.errs, ee)
+			te := append(*e, ee)
+			e = &te
 		case *Errors:
 			err = ee
-			for _, err := range err.(*Errors).errs {
-				e.errs = append(e.errs, err)
+			for _, err := range *err.(*Errors) {
+				te := append(*e, err)
+				e = &te
 			}
 		default:
 			err = NewError(ee)
-			e.errs = append(e.errs, err.(*Error))
+			te := append(*e, err.(*Error))
+			e = &te
 		}
 		if glog.V(3) {
 			glog.Errorln(err)
@@ -71,8 +71,8 @@ func (e *Errors) ErrorStack() string {
 		return ""
 	}
 	ret := make([]string, 0)
-	for i := range e.errs {
-		ret = append(ret, e.errs[i].ErrorStack())
+	for i := range *e {
+		ret = append(ret, (*e)[i].ErrorStack())
 	}
 	return strings.Join(ret, "\n")
 }
@@ -83,8 +83,8 @@ func (e *Errors) Error() string {
 		return ""
 	}
 	ret := make([]string, 0)
-	for i := range e.errs {
-		ret = append(ret, e.errs[i].Error())
+	for i := range *e {
+		ret = append(ret, (*e)[i].Error())
 	}
 	return strings.Join(ret, "\n")
 }
@@ -98,13 +98,13 @@ func (e *Errors) Is(ee error) bool {
 		return false
 	}
 	if errs, ok := ee.(*Errors); ok {
-		for _, err := range errs.errs {
+		for _, err := range *errs {
 			if e.Is(err) {
 				return true
 			}
 		}
 	} else {
-		for _, err := range e.errs {
+		for _, err := range *e {
 			if Is(err, ee) {
 				return true
 			}
@@ -116,7 +116,7 @@ func (e *Errors) Is(ee error) bool {
 // New returns a list of errors with the parameter added to the list.
 func New(err interface{}) *Errors {
 	if err != nil {
-		e := &Errors{errs: make([]*Error, 0)}
+		e := make(Errors, 0)
 		return e.Add(err)
 	} else {
 		return nil
