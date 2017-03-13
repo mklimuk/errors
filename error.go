@@ -84,9 +84,12 @@ type Error struct {
 	Err    error
 	stack  []uintptr
 	frames []StackFrame
+	Ctx    C
 	prefix string
 	id     int
 }
+
+type C map[string]interface{}
 
 // NewError makes an Error from the given value. If that value is already an
 // error then it will be used directly, if not, it will be passed to
@@ -143,7 +146,34 @@ func WrapPrefix(e interface{}, prefix string, skip int) error {
 	}
 
 	return err
+}
 
+// WrapContext makes an Error from the given value saving provided context.
+// If the value is already an error then it will be used directly, if not,
+// it will be passed to fmt.Errorf("%v"). If the context exists already the argument
+// will be merged into it.
+// The prefix parameter is used to add a prefix to the
+// error message when calling Error(). The skip parameter indicates how far
+// up the stack to start the stacktrace. 0 is from the current call,
+// 1 from its caller, etc.
+func WrapWithContext(e interface{}, prefix string, ctx C, skip int) error {
+
+	err := Wrap(e, skip+1).(*Error)
+
+	if err.prefix != "" {
+		err.prefix = fmt.Sprintf("%s: %s", prefix, err.prefix)
+	} else {
+		err.prefix = prefix
+	}
+
+	if err.Ctx == nil {
+		err.Ctx = ctx
+	} else {
+		for k, v := range ctx {
+			err.Ctx[k] = v
+		}
+	}
+	return err
 }
 
 // Is detects whether the error is equal to a given error. Errors
