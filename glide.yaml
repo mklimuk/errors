@@ -1,0 +1,3 @@
+package: github.com/mklimuk/errors
+import:
+- package: github.com/golang/glog
